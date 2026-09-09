@@ -64,6 +64,13 @@ export interface Translations {
   chartSafeLine: string;
   unitMetric: string;
   unitImperial: string;
+  payPerReport: string;
+  reportCredits: string;
+  buyCredits: string;
+  creditRemaining: string;
+  officialReport: string;
+  draftReport: string;
+  unlockOfficialReport: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -130,6 +137,13 @@ export const translations: Record<Language, Translations> = {
     chartSafeLine: 'Batas Maksimum Aman Personil (60°C / ASTM C1055)',
     unitMetric: 'Metrik (SI: mm, °C, kW, bar)',
     unitImperial: 'Imperial (US: in, °F, BTU/h, psi)',
+    payPerReport: 'Pay Per Report',
+    reportCredits: 'Kuota Laporan',
+    buyCredits: 'Beli Kuota Laporan',
+    creditRemaining: 'Kuota Tersisa',
+    officialReport: 'Laporan Resmi Berlisensi',
+    draftReport: 'Draft Sampel (Gratis)',
+    unlockOfficialReport: 'Terbitkan Laporan Resmi (Certified PDF)',
   },
   en: {
     appName: 'ThermoDuct',
@@ -194,5 +208,12 @@ export const translations: Record<Language, Translations> = {
     chartSafeLine: 'Personnel Safety Limit (60°C / 140°F ASTM C1055)',
     unitMetric: 'Metric (SI: mm, °C, kW, bar)',
     unitImperial: 'Imperial (US: in, °F, BTU/h, psi)',
+    payPerReport: 'Pay Per Report',
+    reportCredits: 'Report Credits',
+    buyCredits: 'Buy Report Credits',
+    creditRemaining: 'Credits Remaining',
+    officialReport: 'Official Certified Report',
+    draftReport: 'Draft Preview (Free)',
+    unlockOfficialReport: 'Issue Official Report (Certified PDF)',
   },
 };

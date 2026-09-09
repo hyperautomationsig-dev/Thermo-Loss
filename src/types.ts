@@ -34,6 +34,9 @@ export interface InsulationLayer {
   position: InsulationPosition;
   thicknessMm: number;
   name?: string;
+  isManualConductivity?: boolean;
+  customConductivity?: number; // W/(m·K) manual override
+  customMaxTempC?: number; // °C manual override
 }
 
 export interface FluidProperty {
@@ -48,6 +51,7 @@ export interface FluidProperty {
 export interface CalculationInputs {
   mode: CalculationMode;
   shape: DuctShape;
+  designGoal?: 'find_thickness' | 'find_surface_temp'; // Mode Desain: cari tebal vs cari suhu luar
   
   // Dimensions
   innerDiameterMm: number; // For cylindrical / kiln
@@ -163,4 +167,35 @@ export interface CalculationResults {
     potentialSavingsIdr: number;
     co2EmissionsTonsPerYear: number;
   };
+}
+
+export interface ReportMetadata {
+  projectName?: string;
+  clientName?: string;
+  engineerName?: string;
+  reportNumber?: string;
+  dateStr?: string;
+  isCertified?: boolean;
+}
+
+export interface ReportPricingPlan {
+  id: 'single' | 'pack5' | 'pack20';
+  name: string;
+  reportsCount: number;
+  priceIdr: number;
+  priceUsd: number;
+  popular?: boolean;
+  savingsPercent?: number;
+  description: string;
+}
+
+export interface PurchaseTransaction {
+  id: string;
+  date: string;
+  planId: string;
+  planName: string;
+  reportsAdded: number;
+  amountIdr: number;
+  paymentMethod: 'qris' | 'va' | 'card' | 'voucher';
+  status: 'PAID' | 'PENDING';
 }

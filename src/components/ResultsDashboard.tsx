@@ -82,9 +82,13 @@ export const ResultsDashboard: React.FC<Props> = ({
           id="btn-export-pdf"
           onClick={onExportPDF}
           className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold rounded-xl shadow-md transition-all active:scale-95"
+          title="Ekspor Laporan PDF Lengkap (100% Gratis)"
         >
           <FileDown className="w-4 h-4" />
-          {t.exportPdf}
+          <span>{t.exportPdf}</span>
+          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+            {lang === 'id' ? 'Akses Penuh' : 'Full Access'}
+          </span>
         </button>
       </div>
 
@@ -136,75 +140,143 @@ export const ResultsDashboard: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* 2. Ketebalan Isolator Metric */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-amber-400" />
-              {inputs.hasInsulation === false
-                ? (lang === 'id' ? 'Rekomendasi Isolasi Baru' : 'New Insulation Recom.')
-                : isDesign
-                ? t.insulationThickness
-                : (lang === 'id' ? 'Ketebalan Efektif Lapangan' : 'Field Effective Thickness')}
-            </span>
-            <span
-              className={`text-[10px] px-2 py-0.5 rounded-full border ${
-                inputs.hasInsulation === false
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                  : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-              }`}
-            >
-              {inputs.hasInsulation === false ? 'Bare Duct' : isDesign ? (lang === 'id' ? 'Desain' : 'Design') : (lang === 'id' ? 'Diagnosa' : 'Audit')}
-            </span>
-          </div>
-
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-amber-300 tracking-tight">
-              {unitSystem === 'imperial'
-                ? (results.recommendedInsulationThicknessMm / 25.4).toFixed(2)
-                : results.recommendedInsulationThicknessMm}
-            </span>
-            <span className="text-sm font-semibold text-slate-400">{units.dim}</span>
-            {unitSystem === 'imperial' && (
-              <span className="text-xs text-slate-500 ml-1">
-                ({results.recommendedInsulationThicknessMm} mm)
+        {/* 2. Ketebalan Isolator ATAU Suhu Luar yang Didapat Metric (Permintaan User a.2) */}
+        {isDesign && inputs.designGoal === 'find_surface_temp' ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                <Thermometer className="w-4 h-4 text-emerald-400" />
+                {lang === 'id' ? 'Suhu Luar yang Didapat' : 'Obtained Surface Temp'}
               </span>
-            )}
-            {isDesign && (
-              <button
-                type="button"
-                onClick={() => onApplyRecommendedThickness(results.recommendedInsulationThicknessMm)}
-                className="ml-auto text-[11px] text-amber-400 hover:text-amber-300 underline font-medium"
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full border font-bold uppercase ${
+                  results.personnelProtectionStatus === 'safe'
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    : results.personnelProtectionStatus === 'warning'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : 'bg-red-500/20 text-red-300 border-red-500/40'
+                }`}
               >
-                {inputs.hasInsulation === false
-                  ? (lang === 'id' ? '+ Pasang Isolasi' : '+ Install Insulation')
-                  : (lang === 'id' ? 'Terapkan Nilai' : 'Apply')}
-              </button>
-            )}
-          </div>
+                {results.personnelProtectionStatus === 'safe'
+                  ? (lang === 'id' ? 'Aman Sentuh' : 'Safe')
+                  : (lang === 'id' ? 'Bahaya Panas' : 'Hazard')}
+              </span>
+            </div>
 
-          <div className="mt-2 pt-2 border-t border-slate-800/80 text-xs text-slate-400">
-            {inputs.hasInsulation === false ? (
-              <span className="text-amber-300/90 font-medium">
-                {lang === 'id'
-                  ? `Kondisi telanjang (0 mm). Dihitung agar suhu turun ke ≤ ${unitHelpers.formatTemp(inputs.targetOuterTempC, unitSystem)}`
-                  : `Bare condition (0 mm). Sized so surface temp drops to ≤ ${unitHelpers.formatTemp(inputs.targetOuterTempC, unitSystem)}`}
+            <div className="mt-2 flex items-baseline gap-2">
+              <span
+                className={`text-2xl font-bold tracking-tight ${
+                  results.personnelProtectionStatus === 'safe' ? 'text-emerald-300' : 'text-amber-300'
+                }`}
+              >
+                {unitHelpers.formatTemp(results.outerSurfaceTempC, unitSystem)}
               </span>
-            ) : isDesign ? (
+              {unitSystem === 'imperial' && (
+                <span className="text-xs text-slate-500 ml-1">({results.outerSurfaceTempC}°C)</span>
+              )}
+              <span className="text-xs text-slate-400 ml-auto">
+                {results.outerSurfaceTempC <= (inputs.targetOuterTempC || 60) ? (
+                  <span className="text-emerald-400 font-semibold">
+                    ✓ Aman (≤ {inputs.targetOuterTempC || 60}°C)
+                  </span>
+                ) : (
+                  <span className="text-red-400 font-semibold">
+                    ▲ +{(results.outerSurfaceTempC - (inputs.targetOuterTempC || 60)).toFixed(1)}°C
+                  </span>
+                )}
+              </span>
+            </div>
+
+            <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
               <span>
-                {lang === 'id'
-                  ? `Dibutuhkan agar suhu luar ≤ ${unitHelpers.formatTemp(inputs.targetOuterTempC, unitSystem)} (ASTM C1055)`
-                  : `Required for outer temp ≤ ${unitHelpers.formatTemp(inputs.targetOuterTempC, unitSystem)} (ASTM C1055)`}
+                {lang === 'id' ? 'Tebal terpasang' : 'Installed thickness'}:{' '}
+                <strong className="text-slate-200">
+                  {inputs.hasInsulation === false
+                    ? '0 mm (Bare)'
+                    : `${inputs.layers.reduce((s, l) => s + l.thicknessMm, 0)} mm`}
+                </strong>
               </span>
-            ) : (
-              <span>
-                {lang === 'id'
-                  ? `Kondisi lining saat ini setara ${(results.diagnostic ? (results.diagnostic.effectiveThicknessRatio * 100).toFixed(0) : '100')}% dari desain awal`
-                  : `Current lining condition equivalent to ${(results.diagnostic ? (results.diagnostic.effectiveThicknessRatio * 100).toFixed(0) : '100')}% of original design`}
-              </span>
-            )}
+              {results.outerSurfaceTempC > (inputs.targetOuterTempC || 60) && (
+                <button
+                  type="button"
+                  onClick={() => onApplyRecommendedThickness(results.recommendedInsulationThicknessMm)}
+                  className="text-amber-400 hover:text-amber-300 underline font-semibold text-[11px]"
+                >
+                  {lang === 'id' ? `Solusi: ${results.recommendedInsulationThicknessMm} mm` : `Need ${results.recommendedInsulationThicknessMm}mm`}
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-amber-400" />
+                {inputs.hasInsulation === false
+                  ? (lang === 'id' ? 'Rekomendasi Isolasi Baru' : 'New Insulation Recom.')
+                  : isDesign
+                  ? t.insulationThickness
+                  : (lang === 'id' ? 'Ketebalan Efektif Lapangan' : 'Field Effective Thickness')}
+              </span>
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                  inputs.hasInsulation === false
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                }`}
+              >
+                {inputs.hasInsulation === false ? 'Bare Duct' : isDesign ? (lang === 'id' ? 'Desain' : 'Design') : (lang === 'id' ? 'Diagnosa' : 'Audit')}
+              </span>
+            </div>
+
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-amber-300 tracking-tight">
+                {unitSystem === 'imperial'
+                  ? (results.recommendedInsulationThicknessMm / 25.4).toFixed(2)
+                  : results.recommendedInsulationThicknessMm}
+              </span>
+              <span className="text-sm font-semibold text-slate-400">{units.dim}</span>
+              {unitSystem === 'imperial' && (
+                <span className="text-xs text-slate-500 ml-1">
+                  ({results.recommendedInsulationThicknessMm} mm)
+                </span>
+              )}
+              {isDesign && (
+                <button
+                  type="button"
+                  onClick={() => onApplyRecommendedThickness(results.recommendedInsulationThicknessMm)}
+                  className="ml-auto text-[11px] text-amber-400 hover:text-amber-300 underline font-medium"
+                >
+                  {inputs.hasInsulation === false
+                    ? (lang === 'id' ? '+ Pasang Isolasi' : '+ Install Insulation')
+                    : (lang === 'id' ? 'Terapkan Nilai' : 'Apply')}
+                </button>
+              )}
+            </div>
+
+            <div className="mt-2 pt-2 border-t border-slate-800/80 text-xs text-slate-400">
+              {inputs.hasInsulation === false ? (
+                <span className="text-amber-300/90 font-medium">
+                  {lang === 'id'
+                    ? `Kondisi telanjang (0 mm). Dihitung agar suhu turun ke ≤ ${unitHelpers.formatTemp(inputs.targetOuterTempC, unitSystem)}`
+                    : `Bare condition (0 mm). Sized so surface temp drops to ≤ ${unitHelpers.formatTemp(inputs.targetOuterTempC, unitSystem)}`}
+                </span>
+              ) : isDesign ? (
+                <span>
+                  {lang === 'id'
+                    ? `Dibutuhkan agar suhu luar ≤ ${unitHelpers.formatTemp(inputs.targetOuterTempC, unitSystem)} (ASTM C1055)`
+                    : `Required for outer temp ≤ ${unitHelpers.formatTemp(inputs.targetOuterTempC, unitSystem)} (ASTM C1055)`}
+                </span>
+              ) : (
+                <span>
+                  {lang === 'id'
+                    ? `Kondisi lining saat ini setara ${(results.diagnostic ? (results.diagnostic.effectiveThicknessRatio * 100).toFixed(0) : '100')}% dari desain awal`
+                    : `Current lining condition equivalent to ${(results.diagnostic ? (results.diagnostic.effectiveThicknessRatio * 100).toFixed(0) : '100')}% of original design`}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* 3. Ketebalan Material Ducting Metric */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 relative overflow-hidden">

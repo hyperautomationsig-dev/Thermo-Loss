@@ -103,14 +103,23 @@ export function calculateThermalPerformance(
       .filter((l) => l.position === 'inside' && l.thicknessMm > 0)
       .forEach((l) => {
         const mat = insulationMaterials.find((m) => m.id === l.materialId) || insulationMaterials[0];
+        const conductivity =
+          l.customConductivity !== undefined && l.customConductivity > 0
+            ? l.customConductivity
+            : mat.thermalConductivity;
+        const maxServiceTempC =
+          l.customMaxTempC !== undefined && l.customMaxTempC > 0
+            ? l.customMaxTempC
+            : mat.maxServiceTempC;
+
         rawLayers.push({
           id: l.id,
-          name: l.name || mat.name,
-          materialName: mat.name,
+          name: l.name || (l.customConductivity ? `Custom (k=${conductivity})` : mat.name),
+          materialName: l.customConductivity ? `Custom (k=${conductivity} W/m·K)` : mat.name,
           position: 'inside',
           thicknessM: l.thicknessMm / 1000,
-          conductivity: mat.thermalConductivity,
-          maxServiceTempC: mat.maxServiceTempC,
+          conductivity,
+          maxServiceTempC,
         });
       });
   }
@@ -132,14 +141,23 @@ export function calculateThermalPerformance(
       .filter((l) => l.position === 'outside' && l.thicknessMm > 0)
       .forEach((l) => {
         const mat = insulationMaterials.find((m) => m.id === l.materialId) || insulationMaterials[0];
+        const conductivity =
+          l.customConductivity !== undefined && l.customConductivity > 0
+            ? l.customConductivity
+            : mat.thermalConductivity;
+        const maxServiceTempC =
+          l.customMaxTempC !== undefined && l.customMaxTempC > 0
+            ? l.customMaxTempC
+            : mat.maxServiceTempC;
+
         rawLayers.push({
           id: l.id,
-          name: l.name || mat.name,
-          materialName: mat.name,
+          name: l.name || (l.customConductivity ? `Custom (k=${conductivity})` : mat.name),
+          materialName: l.customConductivity ? `Custom (k=${conductivity} W/m·K)` : mat.name,
           position: 'outside',
           thicknessM: l.thicknessMm / 1000,
-          conductivity: mat.thermalConductivity,
-          maxServiceTempC: mat.maxServiceTempC,
+          conductivity,
+          maxServiceTempC,
         });
       });
   }

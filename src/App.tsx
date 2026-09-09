@@ -26,8 +26,10 @@ import { FinancialCard } from './components/FinancialCard';
 import { ResultsDashboard } from './components/ResultsDashboard';
 import { MaterialModal } from './components/MaterialModal';
 import { HeatLossChart } from './components/HeatLossChart';
+import { WallTemperatureProfileChart } from './components/WallTemperatureProfileChart';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { PayPerReportModal } from './components/PayPerReportModal';
 import { Language, UnitSystem, translations } from './utils/translations';
 import { unitHelpers } from './utils/unitConversion';
 import {
@@ -55,6 +57,7 @@ export default function App() {
     loadInsulationMaterials()
   );
   const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
+  const [isPayReportModalOpen, setIsPayReportModalOpen] = useState(false);
 
   // Canvas ref for PDF snapshot export
   const canvasElementRef = useRef<HTMLCanvasElement | null>(null);
@@ -86,6 +89,7 @@ export default function App() {
     externalEmissivity: 0.85,
 
     // Mode Specific
+    designGoal: 'find_surface_temp', // Default to calculating surface temp from configuration
     targetOuterTempC: 55, // Design mode target surface temp (<60°C for safe touch)
     measuredOuterTempC: 92, // Diagnostic mode field reading
 
@@ -119,9 +123,56 @@ export default function App() {
     return ductMaterials.find((m) => m.id === inputs.ductMaterialId) || ductMaterials[0];
   }, [ductMaterials, inputs.ductMaterialId]);
 
+  const [chartViewMode, setChartViewMode] = useState<'wall_profile' | 'heat_loss_curve' | 'both'>('wall_profile');
+
   // Presets for fast testing
   const applyPreset = (presetName: string) => {
-    if (presetName === 'steam_pipe') {
+    if (presetName === 'cooler_cement') {
+      const mulSic = insulationMaterials.find((m) => m.id === 'ins-neocast-mul-sic-15') || insulationMaterials[0];
+      const mixGun = insulationMaterials.find((m) => m.id === 'ins-neocastmixgun-lw-140') || insulationMaterials[1];
+      const silca = insulationMaterials.find((m) => m.id === 'ins-silca-board-1100') || insulationMaterials[2];
+      const heatSteel = ductMaterials.find((m) => m.category === 'heat_resistant') || ductMaterials[0];
+      setInputs((prev) => ({
+        ...prev,
+        shape: 'rectangular',
+        widthMm: 1600,
+        heightMm: 1400,
+        ductThicknessMm: 10.0,
+        ductMaterialId: heatSteel.id,
+        fluidType: 'flue_gas',
+        fluidTempC: 1200,
+        fluidVelocityMs: 12.0,
+        internalPressureBar: 0.05,
+        ambientTempC: 32,
+        windSpeedMs: 2.0,
+        externalEmissivity: 0.90,
+        hasInsulation: true,
+        isMultiLayer: true,
+        layers: [
+          {
+            id: 'layer-cooler-1',
+            materialId: mulSic.id,
+            position: 'inside',
+            thicknessMm: 220,
+            name: '220 mm NEOCASTSUPER MUL-SIC 15',
+          },
+          {
+            id: 'layer-cooler-2',
+            materialId: mixGun.id,
+            position: 'inside',
+            thicknessMm: 50,
+            name: '50 mm NEOCASTMIXGUN LW 140 A',
+          },
+          {
+            id: 'layer-cooler-3',
+            materialId: silca.id,
+            position: 'outside',
+            thicknessMm: 50,
+            name: '50 mm SILCA BOARD 1100',
+          },
+        ],
+      }));
+    } else if (presetName === 'steam_pipe') {
       const rockwool = insulationMaterials.find((m) => m.category === 'blanket') || insulationMaterials[0];
       const csMat = ductMaterials.find((m) => m.category === 'alloy') || ductMaterials[0];
       setInputs((prev) => ({
@@ -235,9 +286,9 @@ export default function App() {
     setInsulationMaterials(updated);
   };
 
-  // PDF Export
+  // PDF Export - Opens the Pay Per Report & Official Certification Modal
   const handleExportPDF = () => {
-    exportCalculationToPDF(inputs, results, currentDuctMaterial, canvasElementRef.current);
+    setIsPayReportModalOpen(true);
   };
 
   // Apply thickness recommendations directly
@@ -400,40 +451,33 @@ export default function App() {
         </div>
       </header>
 
-      {/* Preset bar */}
+      {/* Preset bar as dropdown menu (Sesuai Permintaan User a.3) */}
       <div className="bg-slate-900/50 border-b border-slate-800/80 px-4 lg:px-8 py-2 flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2">
         <div className="flex items-center gap-2">
-          <Compass className="w-3.5 h-3.5 text-blue-400" />
-          <span className="font-medium text-slate-300">Preset Rekayasa Cepat:</span>
-          <button
-            type="button"
-            onClick={() => applyPreset('steam_pipe')}
-            className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+          <Compass className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+          <label htmlFor="quick-preset-select" className="font-semibold text-slate-300 shrink-0">
+            {lang === 'id' ? 'Preset Rekayasa Cepat:' : 'Quick Engineering Presets:'}
+          </label>
+          <select
+            id="quick-preset-select"
+            defaultValue=""
+            onChange={(e) => {
+              if (e.target.value) {
+                applyPreset(e.target.value);
+                e.target.value = '';
+              }
+            }}
+            className="bg-slate-950 border border-slate-700 hover:border-slate-600 rounded-lg px-3 py-1 text-xs text-slate-200 font-medium focus:outline-none focus:border-blue-500 transition-colors cursor-pointer shadow-xs"
           >
-            Pipa Uap / Steam Pipe (280°C)
-          </button>
-          <button
-            type="button"
-            onClick={() => applyPreset('rotary_kiln')}
-            className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
-          >
-            Rotary Kiln Semen (1150°C)
-          </button>
-          <button
-            type="button"
-            onClick={() => applyPreset('flue_gas_duct')}
-            className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
-          >
-            Ducting Flue Gas Persegi (340°C)
-          </button>
-          <button
-            type="button"
-            onClick={() => applyPreset('bare_pipe')}
-            className="px-2.5 py-1 rounded bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 border border-amber-800/80 transition-colors font-medium flex items-center gap-1"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-            Pipa Telanjang / Bare (220°C)
-          </button>
+            <option value="" disabled>
+              {lang === 'id' ? '-- Pilih Preset Kasus Rekayasa --' : '-- Choose Engineering Preset --'}
+            </option>
+            <option value="cooler_cement">🏭 Cooler Semen Indonesia (Model Vendor 1200°C / 3 Lapis Refraktori)</option>
+            <option value="steam_pipe">Pipa Uap Panas / Steam Pipe (280°C)</option>
+            <option value="rotary_kiln">Rotary Kiln Semen (1150°C)</option>
+            <option value="flue_gas_duct">Ducting Flue Gas Persegi (340°C)</option>
+            <option value="bare_pipe">⚠️ Pipa Telanjang / Bare Pipe (220°C)</option>
+          </select>
         </div>
 
         <div className="text-[11px] text-slate-500">
@@ -667,105 +711,198 @@ export default function App() {
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-emerald-400" />
-                3. Kondisi Lingkungan & Target Suhu
+                3. Parameter Termal & Kondisi Operasi
               </h3>
               <span className="text-[11px] text-slate-400">
                 Mode:{' '}
                 <strong className={inputs.mode === 'design' ? 'text-blue-400' : 'text-amber-400'}>
-                  {inputs.mode === 'design' ? 'Desain Tebal' : 'Diagnosa Aktual'}
+                  {inputs.mode === 'design' ? 'Mode Desain' : 'Mode Diagnosa Lapangan'}
                 </strong>
               </span>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              <div>
-                <label className="block text-slate-400 font-medium mb-1">Suhu Udara Luar (°C)</label>
-                <input
-                  type="number"
-                  value={inputs.ambientTempC}
-                  onChange={(e) =>
-                    setInputs({ ...inputs, ambientTempC: parseFloat(e.target.value) || 25 })
-                  }
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-white font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 font-medium mb-1">Angin v_wind (m/s)</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  value={inputs.windSpeedMs}
-                  onChange={(e) =>
-                    setInputs({ ...inputs, windSpeedMs: parseFloat(e.target.value) || 0 })
-                  }
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-white font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 font-medium mb-1">Emisivitas Luar ε</label>
-                <input
-                  type="number"
-                  step="0.05"
-                  min="0.05"
-                  max="0.99"
-                  value={inputs.externalEmissivity}
-                  onChange={(e) =>
-                    setInputs({ ...inputs, externalEmissivity: parseFloat(e.target.value) || 0.85 })
-                  }
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-white font-mono"
-                />
-              </div>
-            </div>
-
-            {/* Mode Specific Input Field */}
+            {/* A. MODE DESAIN (Permintaan User a.2: Pilihan Jadikan Suhu Luar Output vs Cari Tebal) */}
             {inputs.mode === 'design' ? (
-              <div className="p-3 bg-blue-950/30 border border-blue-800/40 rounded-xl">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs text-blue-300 font-semibold">
-                    Target Suhu Luar Maksimal (°C) [Desain Target]
+              <div className="space-y-3">
+                {/* Selector Tujuan Desain */}
+                <div>
+                  <label htmlFor="design-goal-select" className="block text-xs font-semibold text-slate-300 mb-1">
+                    Tujuan Perhitungan Desain:
                   </label>
-                  <span className="text-[10px] text-blue-400">Standar Personil: ≤ 60°C</span>
-                </div>
-                <div className="flex items-center gap-2 mt-1.5">
-                  <input
-                    type="number"
-                    value={inputs.targetOuterTempC}
+                  <select
+                    id="design-goal-select"
+                    value={inputs.designGoal || 'find_surface_temp'}
                     onChange={(e) =>
-                      setInputs({ ...inputs, targetOuterTempC: parseFloat(e.target.value) || 50 })
+                      setInputs({
+                        ...inputs,
+                        designGoal: e.target.value as 'find_thickness' | 'find_surface_temp',
+                      })
                     }
-                    className="w-24 bg-slate-950 border border-blue-600 rounded-lg px-3 py-1.5 text-white font-bold text-sm"
-                  />
-                  <span className="text-xs text-slate-300">
-                    Sistem akan menghitung tebal isolator yang dibutuhkan agar suhu luar ≤ {inputs.targetOuterTempC}°C.
-                  </span>
+                    className="w-full bg-slate-950 border border-slate-700 hover:border-blue-500 rounded-lg px-2.5 py-1.5 text-xs text-blue-300 font-semibold focus:outline-none focus:border-blue-500 transition-colors"
+                  >
+                    <option value="find_surface_temp">
+                      🌡️ Hitung Suhu Permukaan Luar dari Konfigurasi Tebal (Suhu Luar sebagai Output)
+                    </option>
+                    <option value="find_thickness">
+                      📏 Hitung Tebal Isolasi Optimal dari Target Suhu Luar (Inverse Optimization)
+                    </option>
+                  </select>
                 </div>
+
+                {inputs.designGoal === 'find_surface_temp' ? (
+                  <div className="p-3 bg-blue-950/20 border border-blue-800/40 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-blue-300 font-semibold">
+                        Kondisi: Suhu Permukaan Luar Dihitung sebagai Output
+                      </span>
+                      <span className="text-[10px] text-blue-400">Direct Calculation</span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Aplikasi akan menghitung berapa temperatur luar (<em>T_surface</em>) yang didapat berdasarkan ketebalan isolasi yang Anda masukkan di bawah, serta memverifikasi kesesuaiannya dengan batas personil aman.
+                    </p>
+                    <div className="flex items-center gap-2 pt-1">
+                      <label className="text-xs text-slate-400 shrink-0">
+                        Batas Acuan Maksimal Aman (°C):
+                      </label>
+                      <input
+                        type="number"
+                        value={inputs.targetOuterTempC}
+                        onChange={(e) =>
+                          setInputs({ ...inputs, targetOuterTempC: parseFloat(e.target.value) || 60 })
+                        }
+                        className="w-20 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white font-mono font-bold text-xs"
+                      />
+                      <span className="text-[11px] text-slate-500">(ASTM C1055: ≤ 60°C)</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-blue-950/30 border border-blue-800/40 rounded-xl space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs text-blue-300 font-semibold">
+                        Target Suhu Luar Maksimal (°C) [Desain Target] *
+                      </label>
+                      <span className="text-[10px] text-blue-400">Standar Personil: ≤ 60°C</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={inputs.targetOuterTempC}
+                        onChange={(e) =>
+                          setInputs({ ...inputs, targetOuterTempC: parseFloat(e.target.value) || 50 })
+                        }
+                        className="w-24 bg-slate-950 border border-blue-600 rounded-lg px-3 py-1.5 text-white font-bold text-sm"
+                      />
+                      <span className="text-xs text-slate-300">
+                        Sistem merekomendasikan tebal isolasi minimum agar suhu luar ≤ {inputs.targetOuterTempC}°C.
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="p-3 bg-amber-950/30 border border-amber-800/40 rounded-xl">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs text-amber-300 font-semibold">
-                    Temperatur Luar Terukur Nyata (°C) [Diagnosa Lapangan]
-                  </label>
-                  <span className="text-[10px] text-amber-400">Thermal Camera / Pyrometer</span>
+              /* B. MODE DIAGNOSA (Permintaan User b: Posisi dibalik antara Suhu Shell Terukur dahulu, lalu Target Suhu) */
+              <div className="space-y-3">
+                {/* 1. Suhu Shell / Body Terukur Dahulu (Hasil Inspeksi Lapangan) */}
+                <div className="p-3 bg-amber-950/30 border border-amber-800/50 rounded-xl space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-amber-300 font-bold flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                      1. Temperatur Shell / Body Terukur (°C) [Hasil Inspeksi Lapangan] *
+                    </label>
+                    <span className="text-[10px] text-amber-400 font-mono">Termografi IR / Pyrometer</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={inputs.measuredOuterTempC}
+                      onChange={(e) =>
+                        setInputs({ ...inputs, measuredOuterTempC: parseFloat(e.target.value) || 80 })
+                      }
+                      className="w-28 bg-slate-950 border border-amber-500 rounded-lg px-3 py-1.5 text-amber-300 font-mono font-bold text-base shadow-xs"
+                    />
+                    <span className="text-xs text-slate-300">
+                      Temperatur aktual dinding luar shell hasil pengukuran lapangan untuk mendeteksi degradasi isolasi.
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 mt-1.5">
-                  <input
-                    type="number"
-                    value={inputs.measuredOuterTempC}
-                    onChange={(e) =>
-                      setInputs({ ...inputs, measuredOuterTempC: parseFloat(e.target.value) || 80 })
-                    }
-                    className="w-24 bg-slate-950 border border-amber-600 rounded-lg px-3 py-1.5 text-white font-bold text-sm"
-                  />
-                  <span className="text-xs text-slate-300">
-                    Sebagai input diagnosa untuk mendeteksi degradasi isolasi atau lining retak/tipis.
-                  </span>
+
+                {/* 2. Target Suhu Permukaan Luar Setelahnya */}
+                <div className="p-2.5 bg-slate-950/80 border border-slate-800 rounded-xl flex items-center justify-between gap-2">
+                  <div>
+                    <label className="text-xs text-slate-300 font-semibold block">
+                      2. Target Suhu Permukaan Luar (°C) [Batas Standar / Desain Acuan]
+                    </label>
+                    <span className="text-[11px] text-slate-500">
+                      Batas keselamatan sentuh personil (ASTM C1055: ≤ 60°C)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      value={inputs.targetOuterTempC}
+                      onChange={(e) =>
+                        setInputs({ ...inputs, targetOuterTempC: parseFloat(e.target.value) || 60 })
+                      }
+                      className="w-20 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-right text-white font-mono font-semibold text-xs"
+                    />
+                    <span className="text-slate-400 text-xs">°C</span>
+                  </div>
                 </div>
               </div>
             )}
+
+            {/* 3. Parameter Udara Lingkungan Sekitar (Ambient) */}
+            <div className="pt-2 border-t border-slate-800/80">
+              <span className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Kondisi Udara Lingkungan Sekitar (Ambient):
+              </span>
+
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">
+                    Suhu Udara Sekitar T_amb (°C)
+                  </label>
+                  <input
+                    type="number"
+                    value={inputs.ambientTempC}
+                    onChange={(e) =>
+                      setInputs({ ...inputs, ambientTempC: parseFloat(e.target.value) || 25 })
+                    }
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-white font-mono"
+                    title="Temperatur udara bebas sekitar ducting"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Angin v_wind (m/s)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    value={inputs.windSpeedMs}
+                    onChange={(e) =>
+                      setInputs({ ...inputs, windSpeedMs: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-white font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Emisivitas Luar ε</label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="0.05"
+                    max="0.99"
+                    value={inputs.externalEmissivity}
+                    onChange={(e) =>
+                      setInputs({ ...inputs, externalEmissivity: parseFloat(e.target.value) || 0.85 })
+                    }
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-white font-mono"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Layer Manager Component */}
@@ -807,13 +944,80 @@ export default function App() {
             onApplyRecommendedDuctThickness={handleApplyRecommendedDuct}
           />
 
-          {/* Interactive Heat Loss vs Insulation Thickness Curve Chart */}
-          <HeatLossChart
-            inputs={inputs}
-            results={results}
-            lang={lang}
-            unitSystem={unitSystem}
-          />
+          {/* Chart View Switcher Tabs */}
+          <div className="flex flex-wrap items-center justify-between gap-2 p-1.5 bg-slate-900/90 border border-slate-800 rounded-xl">
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setChartViewMode('wall_profile')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  chartViewMode === 'wall_profile'
+                    ? 'bg-red-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+              >
+                <span>📊</span>
+                <span>
+                  {lang === 'id'
+                    ? 'Diagram Profil Gradien Suhu (Model Vendor ASTM C680)'
+                    : 'Wall Temperature Profile (Vendor Standard)'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setChartViewMode('heat_loss_curve')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  chartViewMode === 'heat_loss_curve'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+              >
+                <span>📉</span>
+                <span>
+                  {lang === 'id'
+                    ? 'Kurva Penurunan Heat Loss vs Tebal'
+                    : 'Heat Loss vs Thickness Curve'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setChartViewMode('both')}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  chartViewMode === 'both'
+                    ? 'bg-slate-700 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+                title="Tampilkan Kedua Grafik"
+              >
+                {lang === 'id' ? 'Tampilkan Keduanya' : 'Show Both'}
+              </button>
+            </div>
+
+            <span className="text-[11px] text-slate-500 hidden sm:inline px-2">
+              ASTM C680 & C1055 Compliant
+            </span>
+          </div>
+
+          {/* Conditional Rendering of Charts */}
+          {(chartViewMode === 'wall_profile' || chartViewMode === 'both') && (
+            <WallTemperatureProfileChart
+              inputs={inputs}
+              results={results}
+              lang={lang}
+              unitSystem={unitSystem}
+            />
+          )}
+
+          {(chartViewMode === 'heat_loss_curve' || chartViewMode === 'both') && (
+            <HeatLossChart
+              inputs={inputs}
+              results={results}
+              lang={lang}
+              unitSystem={unitSystem}
+            />
+          )}
 
           {/* Financial & Energy Loss Analysis Card */}
           <FinancialCard
@@ -834,6 +1038,18 @@ export default function App() {
 
       {/* Offline Status Toast Indicator */}
       <OfflineIndicator lang={lang} />
+
+      {/* Pay Per Report & Official Certification Modal */}
+      <PayPerReportModal
+        isOpen={isPayReportModalOpen}
+        onClose={() => setIsPayReportModalOpen(false)}
+        inputs={inputs}
+        results={results}
+        ductMaterial={currentDuctMaterial}
+        canvasElement={canvasElementRef.current}
+        lang={lang}
+        unitSystem={unitSystem}
+      />
 
       {/* Footer note */}
       <footer className="border-t border-slate-900 bg-slate-950 py-3 px-6 text-center text-xs text-slate-500">
